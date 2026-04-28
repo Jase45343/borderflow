@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BorderFlow — Control Tower</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #f5f5f5; color: #222; }
+    
+    #login-screen {
+      display: flex; justify-content: center; align-items: center;
+      min-height: 100vh; background: #1a1a2e;
+    }
+    .login-card {
+      background: white; border-radius: 12px; padding: 2.5rem;
+      width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .login-card h1 { font-size: 1.8rem; margin-bottom: 0.5rem; color: #1a1a2e; }
+    .login-card p { color: #666; margin-bottom: 1.5rem; font-size: 0.9rem; }
+    .login-card label { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 1rem; font-size: 0.85rem; color: #555; }
+    .login-card input { padding: 0.7rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; }
+    .login-card button {
+      width: 100%; padding: 0.8rem; background: #1a1a2e; color: white;
+      border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; margin-top: 0.5rem;
+    }
+    .login-card button:hover { background: #2d2d5e; }
+    .login-error { color: #dc2626; font-size: 0.85rem; margin-top: 0.5rem; }
+    .login-status { font-size: 0.85rem; margin-top: 0.5rem; color: #888; }
+    
+    .quick-login { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #eee; }
+    .quick-login h3 { font-size: 0.85rem; color: #888; margin-bottom: 0.8rem; }
+    .role-buttons { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .role-btn {
+      padding: 0.3rem 0.7rem; border: 1px solid #ddd; border-radius: 6px;
+      background: white; cursor: pointer; font-size: 0.75rem; color: #555;
+    }
+    .role-btn:hover { background: #f0f0ff; border-color: #1a1a2e; }
+
+    .app-header { display: none; }
+    .app-header.show { display: block; }
+    header { background: #1a1a2e; color: white; padding: 0.8rem 2rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    .user-info { margin-left: auto; display: flex; align-items: center; gap: 0.8rem; font-size: 0.85rem; }
+    .user-role { padding: 2px 10px; border-radius: 999px; background: #2d2d5e; color: #a0a0ff; font-size: 0.75rem; }
+    .user-site { font-size: 0.75rem; color: #aaa; }
+    .logout-btn { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white; padding: 0.3rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+    .logout-btn:hover { background: rgba(255,255,255,0.15); }
+
+    nav { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+    nav button { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white; padding: 0.35rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+    nav button.active, nav button:hover { background: rgba(255,255,255,0.15); }
+    nav button:disabled { opacity: 0.3; cursor: not-allowed; background: transparent; }
+
+    .site-bar { background: #12122a; padding: 0.5rem 2rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; }
+    .site-bar label { color: #aaa; }
+    .site-bar select { padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid #444; background: #1e1e3a; color: white; font-size: 0.8rem; }
+    .site-badge { font-size: 0.7rem; padding: 2px 10px; border-radius: 999px; background: #2d2d5e; color: #a0a0ff; }
+    .site-indicator { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block; }
+    .connected-site { color: #6ee7b7; font-size: 0.75rem; }
+
+    main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
+    h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: #333; }
+    .card { background: white; border-radius: 10px; border: 1px solid #e0e0e0; padding: 1.5rem; margin-bottom: 1.5rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 2px solid #eee; color: #555; font-weight: 600; }
+    td { padding: 0.5rem 0.6rem; border-bottom: 1px solid #f0f0f0; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 500; }
+    .badge.in_transit  { background:#dbeafe;color:#1e40af }
+    .badge.at_border   { background:#fef9c3;color:#854d0e }
+    .badge.cleared     { background:#dcfce7;color:#166534 }
+    .badge.delivered   { background:#f0fdf4;color:#15803d }
+    .badge.pending     { background:#f3f4f6;color:#374151 }
+    .badge.completed   { background:#dcfce7;color:#166534 }
+    .badge.in_progress { background:#dbeafe;color:#1e40af }
+    .badge.scheduled   { background:#f3f4f6;color:#374151 }
+    .badge.cancelled   { background:#fee2e2;color:#991b1b }
+    .badge.arrived     { background:#ede9fe;color:#5b21b6 }
+    .badge.released    { background:#dcfce7;color:#166534 }
+    .badge.gate_in     { background:#fef9c3;color:#854d0e }
+    .badge.queued      { background:#ffedd5;color:#9a3412 }
+    .badge.ok, .badge.online  { background:#dcfce7;color:#166534 }
+    .badge.offline     { background:#fee2e2;color:#991b1b }
+
+    .section { display: none; }
+    .section.active { display: block; }
+    form { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+    form label { font-size: 0.82rem; color: #555; display: flex; flex-direction: column; gap: 0.25rem; }
+    form input, form select, form textarea { padding: 0.5rem 0.6rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.85rem; }
+    form textarea { resize: vertical; min-height: 60px; }
+    form button { grid-column: span 2; padding: 0.55rem; background: #1a1a2e; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+    form button:hover { background: #2d2d5e; }
+    .msg { font-size: 0.8rem; margin-top: 0.4rem; }
+    .msg.success { color: #166534; }
+    .msg.error { color: #dc2626; }
+
+    .empty-state { text-align: center; padding: 2rem; color: #999; font-size: 0.9rem; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .stat-card { background: white; border-radius: 10px; border: 1px solid #e0e0e0; padding: 1.2rem; text-align: center; }
+    .stat-card .stat-value { font-size: 2rem; font-weight: 700; color: #1a1a2e; }
+    .stat-card .stat-label { font-size: 0.8rem; color: #888; margin-top: 0.3rem; }
+
+    @media (max-width: 768px) {
+      main { padding: 1rem; }
+      form { grid-template-columns: 1fr; }
+      form button { grid-column: span 1; }
+      header { padding: 0.6rem 1rem; }
+      .user-info { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ========== LOGIN SCREEN ========== -->
+<div id="login-screen">
+  <div class="login-card">
+    <h1>🚛 BorderFlow</h1>
+    <p>Container Logistics Control Tower</p>
+    
+    <label>Username
+      <input type="text" id="login-username" placeholder="e.g., thabo.dispatcher">
+    </label>
+    <label>Password
+      <input type="password" id="login-password" placeholder="Enter password">
+    </label>
+    <button onclick="login()">Sign In</button>
+    <div class="login-error" id="login-error"></div>
+    <div class="login-status" id="login-status"></div>
+
+    <div class="quick-login">
+      <h3>🔑 Quick Login (Dev Mode)</h3>
+      <div class="role-buttons">
+        <button class="role-btn" onclick="quickLogin('thabo.dispatcher', 'depot1234')" title="Maseru Depot">📦 Dispatcher</button>
+        <button class="role-btn" onclick="quickLogin('sipho.driver', 'driver1234')" title="Ficksburg Border">🚛 Driver</button>
+        <button class="role-btn" onclick="quickLogin('ndlovu.port', 'port1234')" title="Durban Port">⚓ Port Agent</button>
+        <button class="role-btn" onclick="quickLogin('lerato.yard', 'yard1234')" title="Maseru Depot">🏗️ Yard Clerk</button>
+        <button class="role-btn" onclick="quickLogin('tau.border', 'border1234')" title="Ficksburg Border">🛃 Border Liaison</button>
+        <button class="role-btn" onclick="quickLogin('lstextiles.client', 'client1234')" title="Client">👤 Client</button>
+        <button class="role-btn" onclick="quickLogin('admin.mgmt', 'mgmt1234')" title="Management">🔍 Management</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== APP ========== -->
+<div class="app-header" id="app-header">
+  <header>
+    <h1>🚛 BorderFlow</h1>
+    <nav id="main-nav">
+      <button class="active" onclick="show('tower',this)">📊 Control Tower</button>
+      <button onclick="show('containers',this)">📦 Containers</button>
+      <button onclick="show('trips',this)">🚛 Trips</button>
+      <button onclick="show('milestones',this)">📍 Milestones</button>
+      <button id="nav-new-trip" onclick="show('new-trip',this)">➕ New Trip</button>
+      <button id="nav-new-milestone" onclick="show('new-milestone',this)">📍 Record</button>
+      <button id="nav-new-handover" onclick="show('new-handover',this)">🔄 Handover</button>
+      <button id="nav-incidents" onclick="show('incidents',this)">⚠️ Incidents</button>
+      <button id="nav-sync" onclick="show('sync-status',this)">🔄 Sync</button>
+    </nav>
+    <div class="user-info">
+      <span id="user-name"></span>
+      <span class="user-role" id="user-role"></span>
+      <span class="user-site" id="user-site"></span>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+  </header>
+
+  <div class="site-bar">
+    <label>Active site:
+      <select id="site-select" onchange="changeSite()">
+        <option value="http://localhost:4001">Site 1 — Maseru Depot</option>
+        <option value="http://localhost:4002">Site 2 — Ficksburg Border Post</option>
+        <option value="http://localhost:4003">Site 3 — Durban Port</option>
+        <option value="http://localhost:4004">Site 4 — Johannesburg Hub</option>
+      </select>
+    </label>
+    <span class="site-badge" id="site-badge">Site 1 — Maseru Depot</span>
+    <div class="site-indicator">
+      <span class="status-dot" id="site-status-dot"></span>
+      <span class="connected-site" id="site-status-text">Connected</span>
+    </div>
+  </div>
+
+  <main>
+    <div id="tower" class="section active">
+      <div class="stats-grid" id="stats-grid"></div>
+      <div class="card">
+        <h2>📊 Control Tower — Live Container Status</h2>
+        <table>
+          <thead><tr><th>Container</th><th>Status</th><th>Current Site</th><th>Last Milestone</th><th>Last Event</th></tr></thead>
+          <tbody id="tower-body"><tr><td colspan="5">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="containers" class="section">
+      <div class="card">
+        <h2>📦 Containers</h2>
+        <table>
+          <thead><tr><th>ID</th><th>Container #</th><th>Size</th><th>Type</th><th>Status</th><th>Consignment</th></tr></thead>
+          <tbody id="containers-body"><tr><td colspan="6">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="trips" class="section">
+      <div class="card">
+        <h2 id="trips-title">🚛 All Trips</h2>
+        <table>
+          <thead><tr><th>Trip</th><th>Driver</th><th>Vehicle</th><th>Origin</th><th>Destination</th><th>Status</th></tr></thead>
+          <tbody id="trips-body"><tr><td colspan="6">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="milestones" class="section">
+      <div class="card">
+        <h2>📍 Container Milestones</h2>
+        <div style="margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
+          <label style="font-size:0.85rem;color:#555">
+            Container ID:
+            <input type="number" id="milestone-container-id" value="1" min="1"
+              style="width:80px;padding:0.4rem;border:1px solid #ddd;border-radius:6px;margin-left:0.5rem">
+          </label>
+          <button onclick="loadMilestones()"
+            style="padding:0.4rem 0.8rem;background:#1a1a2e;color:white;border:none;border-radius:6px;cursor:pointer">
+            Load
+          </button>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Site</th><th>Status</th><th>Timestamp</th></tr></thead>
+          <tbody id="milestones-body"><tr><td colspan="4">Enter a container ID and click Load.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="new-trip" class="section">
+      <div class="card">
+        <h2>➕ Create New Trip</h2>
+        <form onsubmit="createTrip(event)">
+          <label>Vehicle ID <input type="number" id="t-vehicle" required min="1"></label>
+          <label>Driver ID  <input type="number" id="t-driver"  required min="1"></label>
+          <label>Origin Site ID      <input type="number" id="t-origin" required min="1"></label>
+          <label>Destination Site ID <input type="number" id="t-dest"   required min="1"></label>
+          <label>Departure Time <input type="datetime-local" id="t-departure" required></label>
+          <label></label>
+          <button type="submit">Create Trip</button>
+        </form>
+        <div id="trip-msg" class="msg"></div>
+      </div>
+    </div>
+
+    <div id="new-milestone" class="section">
+      <div class="card">
+        <h2>📍 Record Milestone</h2>
+        <form onsubmit="createMilestone(event)">
+          <label>Container ID <input type="number" id="m-container" required min="1"></label>
+          <label>Site ID      <input type="number" id="m-site"      required min="1"></label>
+          <label>Status
+            <select id="m-status">
+              <option value="arrived">arrived</option>
+              <option value="queued">queued</option>
+              <option value="cleared">cleared</option>
+              <option value="gate_in">gate_in</option>
+              <option value="released">released</option>
+              <option value="delivered">delivered</option>
+            </select>
+          </label>
+          <label></label>
+          <button type="submit">Record Milestone</button>
+        </form>
+        <div id="milestone-msg" class="msg"></div>
+      </div>
+    </div>
+
+    <div id="new-handover" class="section">
+      <div class="card">
+        <h2>🔄 Record Handover</h2>
+        <form onsubmit="createHandover(event)">
+          <label>Container ID  <input type="number" id="h-container"   required min="1"></label>
+          <label>From Site ID  <input type="number" id="h-from"        required min="1"></label>
+          <label>To Site ID    <input type="number" id="h-to"          required min="1"></label>
+          <label>Verified By   <input type="text"   id="h-verified"    required></label>
+          <button type="submit">Record Handover</button>
+        </form>
+        <div id="handover-msg" class="msg"></div>
+      </div>
+    </div>
+
+    <div id="incidents" class="section">
+      <div class="card">
+        <h2>⚠️ Report Incident</h2>
+        <form onsubmit="createIncident(event)">
+          <label>Container ID <input type="number" id="i-container" required min="1"></label>
+          <label>Trip ID      <input type="number" id="i-trip"      required min="1"></label>
+          <label>Type
+            <select id="i-type">
+              <option value="breakdown">breakdown</option>
+              <option value="document_problem">document_problem</option>
+              <option value="damage">damage</option>
+              <option value="security">security</option>
+              <option value="delay">delay</option>
+            </select>
+          </label>
+          <label>Description <textarea id="i-description" required></textarea></label>
+          <button type="submit">Report Incident</button>
+        </form>
+        <div id="incident-msg" class="msg"></div>
+      </div>
+    </div>
+
+    <div id="sync-status" class="section">
+      <div class="card">
+        <h2>🔄 Sync Status — All Sites</h2>
+        <table>
+          <thead><tr><th>Site</th><th>URL</th><th>Status</th><th>Containers</th><th>Milestones (Ctr 1)</th></tr></thead>
+          <tbody id="sync-body"><tr><td colspan="5">Click "Check all sites" to test connectivity.</td></tr></tbody>
+        </table>
+        <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+          <button onclick="checkAllSites()"
+            style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:6px;cursor:pointer">
+            🔍 Check all sites
+          </button>
+          <button onclick="triggerSync()" id="sync-btn"
+            style="padding:0.5rem 1rem;background:#166534;color:white;border:none;border-radius:6px;cursor:pointer">
+            🔄 Sync to all sites
+          </button>
+        </div>
+        <div id="sync-msg" class="msg" style="margin-top:0.5rem"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ============================================================
+// GLOBAL STATE
+// ============================================================
+let AUTH_TOKEN = null
+let CURRENT_USER = null
+let LOGIN_PASSWORD = null  // stored for re-login to correct site
+let API = 'http://localhost:4001'
+
+const SITES = [
+  { id: 1, name: 'Maseru Depot',          url: 'http://localhost:4001', internal: 'http://depot-app:3000'  },
+  { id: 2, name: 'Ficksburg Border Post', url: 'http://localhost:4002', internal: 'http://border-app:3000' },
+  { id: 3, name: 'Durban Port',           url: 'http://localhost:4003', internal: 'http://port-app:3000'   },
+  { id: 4, name: 'Johannesburg Hub',      url: 'http://localhost:4004', internal: 'http://hub-app:3000'    },
+]
+
+const ROLE_SITE_MAP = {
+  'dispatcher': 1,
+  'driver': 2,
+  'port_agent': 3,
+  'yard_clerk': 1,
+  'border_liaison': 2,
+  'client': 1,
+  'management': 1,
+}
+
+const ROLE_NAV_MAP = {
+  'dispatcher':     ['tower','containers','trips','milestones','new-trip','new-milestone','new-handover','incidents','sync-status'],
+  'driver':         ['tower','containers','trips','milestones'],
+  'port_agent':     ['tower','containers','trips','milestones','new-milestone','new-handover','incidents','sync-status'],
+  'yard_clerk':     ['tower','containers','milestones','new-milestone','new-handover','incidents'],
+  'border_liaison': ['tower','containers','trips','milestones','new-milestone','new-handover','incidents','sync-status'],
+  'client':         ['tower','containers','milestones'],
+  'management':     ['tower','containers','trips','milestones','new-trip','new-milestone','new-handover','incidents','sync-status'],
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function authHeaders() {
+  const headers = { 'Content-Type': 'application/json' }
+  if (AUTH_TOKEN) {
+    headers['Authorization'] = `Bearer ${AUTH_TOKEN}`
+  }
+  return headers
+}
+
+async function authFetch(url, options = {}) {
+  try {
+    const res = await fetch(url, { ...options, headers: { ...authHeaders(), ...(options.headers || {}) } })
+    
+    if (res.status === 401) {
+      console.log('Token expired, logging out')
+      logout()
+      throw new Error('Session expired')
+    }
+    
+    const data = await res.json()
+    
+    if (res.status === 403) {
+      throw new Error(data.error || 'Permission denied')
+    }
+    
+    return data
+  } catch (e) {
+    if (e.message === 'Session expired') throw e
+    console.error('Fetch error:', e.message)
+    return null
+  }
+}
+
+// ============================================================
+// LOGIN / LOGOUT (SOLUTION 2: Re-login to correct site)
+// ============================================================
+async function login() {
+  const username = document.getElementById('login-username').value.trim()
+  const password = document.getElementById('login-password').value
+  const errorEl = document.getElementById('login-error')
+  const statusEl = document.getElementById('login-status')
+  errorEl.textContent = ''
+  statusEl.textContent = ''
+
+  if (!username || !password) {
+    errorEl.textContent = 'Please enter username and password.'
+    return
+  }
+
+  LOGIN_PASSWORD = password
+  statusEl.textContent = 'Authenticating...'
+
+  // Step 1: Try logging in on any available site to verify credentials
+  let firstResult = null
+  for (const site of SITES) {
+    try {
+      const res = await fetch(`${site.url}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+      if (res.ok) {
+        firstResult = await res.json()
+        break
+      }
+    } catch (e) {
+      continue
+    }
+  }
+
+  if (!firstResult || !firstResult.token) {
+    errorEl.textContent = 'Invalid credentials or all sites unreachable.'
+    statusEl.textContent = ''
+    return
+  }
+
+  CURRENT_USER = firstResult.user
+  statusEl.textContent = `Logged in as ${CURRENT_USER.full_name} (${CURRENT_USER.role})`
+
+  // Step 2: Determine which site this user belongs to
+  const userSiteId = CURRENT_USER.site_id || ROLE_SITE_MAP[CURRENT_USER.role] || 1
+  const userSite = SITES.find(s => s.id === userSiteId) || SITES[0]
+
+  // Step 3: Re-login against the user's home site to get a valid token for that site
+  if (userSite.url !== SITES[0].url) {
+    statusEl.textContent = `Switching to ${userSite.name}...`
+    try {
+      const res = await fetch(`${userSite.url}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+      if (res.ok) {
+        const siteResult = await res.json()
+        AUTH_TOKEN = siteResult.token
+        CURRENT_USER = siteResult.user
+        console.log('Re-logged in against home site:', userSite.name)
+      } else {
+        // Fall back to the first site's token
+        AUTH_TOKEN = firstResult.token
+        console.log('Could not re-login to home site, using first site token')
+      }
+    } catch (e) {
+      AUTH_TOKEN = firstResult.token
+      console.log('Home site unreachable, using first site token')
+    }
+  } else {
+    AUTH_TOKEN = firstResult.token
+  }
+
+  // Store session
+  sessionStorage.setItem('borderflow_token', AUTH_TOKEN)
+  sessionStorage.setItem('borderflow_user', JSON.stringify(CURRENT_USER))
+  sessionStorage.setItem('borderflow_password', password)
+
+  // Set API to user's home site
+  API = userSite.url
+  document.getElementById('site-select').value = userSite.url
+  updateSiteBadge()
+
+  // Show app
+  document.getElementById('login-screen').style.display = 'none'
+  document.getElementById('app-header').classList.add('show')
+
+  // Update header
+  document.getElementById('user-name').textContent = CURRENT_USER.full_name
+  document.getElementById('user-role').textContent = CURRENT_USER.role.replace(/_/g, ' ')
+  document.getElementById('user-site').textContent = `Site ${userSiteId} — ${userSite.name}`
+
+  // Configure UI
+  configureRoleUI()
+
+  // Load data
+  loadTower()
+  loadContainers()
+  loadTrips()
+}
+
+function quickLogin(username, password) {
+  document.getElementById('login-username').value = username
+  document.getElementById('login-password').value = password
+  login()
+}
+
+function logout() {
+  AUTH_TOKEN = null
+  CURRENT_USER = null
+  LOGIN_PASSWORD = null
+  sessionStorage.clear()
+  document.getElementById('login-screen').style.display = 'flex'
+  document.getElementById('app-header').classList.remove('show')
+  document.getElementById('login-error').textContent = ''
+  document.getElementById('login-status').textContent = ''
+  document.getElementById('login-username').value = ''
+  document.getElementById('login-password').value = ''
+}
+
+function configureRoleUI() {
+  const allowedNavs = ROLE_NAV_MAP[CURRENT_USER.role] || []
+  
+  document.querySelectorAll('#main-nav button').forEach(btn => {
+    const onclick = btn.getAttribute('onclick')
+    if (!onclick) return
+    const match = onclick.match(/show\('([^']+)'/)
+    if (!match) return
+    const tabId = match[1]
+    
+    if (!allowedNavs.includes(tabId)) {
+      btn.disabled = true
+      btn.style.opacity = '0.3'
+      btn.style.cursor = 'not-allowed'
+      btn.title = `Not available for ${CURRENT_USER.role}`
+    } else {
+      btn.disabled = false
+      btn.style.opacity = '1'
+      btn.style.cursor = 'pointer'
+      btn.title = ''
+    }
+  })
+
+  if (CURRENT_USER.role === 'driver') {
+    document.getElementById('trips-title').textContent = '🚛 My Trips'
+  } else {
+    document.getElementById('trips-title').textContent = '🚛 All Trips'
+  }
+}
+
+// ============================================================
+// SITE SWITCHING
+// ============================================================
+async function changeSite() {
+  const sel = document.getElementById('site-select')
+  const newSiteUrl = sel.value
+  
+  // Re-login against the new site to get a valid token
+  if (LOGIN_PASSWORD && CURRENT_USER) {
+    try {
+      const res = await fetch(`${newSiteUrl}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: CURRENT_USER.username, password: LOGIN_PASSWORD })
+      })
+      if (res.ok) {
+        const result = await res.json()
+        AUTH_TOKEN = result.token
+        sessionStorage.setItem('borderflow_token', AUTH_TOKEN)
+        console.log('Re-logged in against:', newSiteUrl)
+      }
+    } catch (e) {
+      console.log('Could not re-login to new site, keeping existing token')
+    }
+  }
+  
+  API = newSiteUrl
+  updateSiteBadge()
+  loadTower()
+  loadContainers()
+  loadTrips()
+}
+
+function updateSiteBadge() {
+  const site = SITES.find(s => s.url === API)
+  document.getElementById('site-badge').textContent = site ? site.name : 'Unknown'
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function show(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'))
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'))
+  
+  const section = document.getElementById(id)
+  if (section) section.classList.add('active')
+  if (btn) btn.classList.add('active')
+  
+  if (id === 'tower') loadTower()
+  if (id === 'containers') loadContainers()
+  if (id === 'trips') loadTrips()
+}
+
+function fmt(ts) {
+  if (!ts) return '—'
+  return new Date(ts).toLocaleString()
+}
+
+// ============================================================
+// DATA LOADING
+// ============================================================
+async function loadTower() {
+  const tbody = document.getElementById('tower-body')
+  tbody.innerHTML = '<tr><td colspan="5">Loading...</td></tr>'
+  
+  try {
+    const data = await authFetch(`${API}/control-tower`)
+    if (!data) {
+      tbody.innerHTML = '<tr><td colspan="5">Unable to load. Site may be offline.</td></tr>'
+      return
+    }
+    if (!Array.isArray(data) || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No containers found.</td></tr>'
+      return
+    }
+    tbody.innerHTML = data.map(r => `
+      <tr>
+        <td>${r.container_number || '—'}</td>
+        <td><span class="badge ${r.container_status || ''}">${r.container_status || '—'}</span></td>
+        <td>${r.current_site || '—'}</td>
+        <td><span class="badge ${r.last_milestone || ''}">${r.last_milestone || '—'}</span></td>
+        <td>${fmt(r.last_event)}</td>
+      </tr>`).join('')
+  } catch (e) {
+    if (e.message === 'Session expired') return
+    tbody.innerHTML = `<tr><td colspan="5">Error: ${e.message}</td></tr>`
+  }
+}
+
+async function loadContainers() {
+  const tbody = document.getElementById('containers-body')
+  tbody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>'
+  
+  try {
+    const data = await authFetch(`${API}/containers`)
+    if (!data) {
+      tbody.innerHTML = '<tr><td colspan="6">Unable to load. Site may be offline.</td></tr>'
+      return
+    }
+    if (!Array.isArray(data) || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No containers found.</td></tr>'
+      return
+    }
+    tbody.innerHTML = data.map(r => `
+      <tr>
+        <td>${r.container_id || '—'}</td>
+        <td>${r.container_number || '—'}</td>
+        <td>${r.size || '—'}</td>
+        <td>${r.type || '—'}</td>
+        <td><span class="badge ${r.status || ''}">${r.status || '—'}</span></td>
+        <td>${r.consignment_id || '—'}</td>
+      </tr>`).join('')
+  } catch (e) {
+    if (e.message === 'Session expired') return
+    tbody.innerHTML = `<tr><td colspan="6">Error: ${e.message}</td></tr>`
+  }
+}
+
+async function loadTrips() {
+  const tbody = document.getElementById('trips-body')
+  tbody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>'
+  
+  try {
+    const data = await authFetch(`${API}/trips`)
+    if (!data) {
+      tbody.innerHTML = '<tr><td colspan="6">Unable to load. Site may be offline.</td></tr>'
+      return
+    }
+    if (!Array.isArray(data) || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No trips found.</td></tr>'
+      return
+    }
+    tbody.innerHTML = data.map(r => `
+      <tr>
+        <td>${r.trip_id || '—'}</td>
+        <td>${r.driver_name || '—'}</td>
+        <td>${r.registration_number || '—'}</td>
+        <td>${r.origin || '—'}</td>
+        <td>${r.destination || '—'}</td>
+        <td><span class="badge ${r.status || ''}">${r.status || '—'}</span></td>
+      </tr>`).join('')
+  } catch (e) {
+    if (e.message === 'Session expired') return
+    tbody.innerHTML = `<tr><td colspan="6">Error: ${e.message}</td></tr>`
+  }
+}
+
+async function loadMilestones() {
+  const id = document.getElementById('milestone-container-id').value
+  const tbody = document.getElementById('milestones-body')
+  tbody.innerHTML = '<tr><td colspan="4">Loading...</td></tr>'
+  
+  try {
+    const data = await authFetch(`${API}/milestones/${id}`)
+    if (!data) {
+      tbody.innerHTML = '<tr><td colspan="4">Unable to load. Site may be offline.</td></tr>'
+      return
+    }
+    if (!Array.isArray(data) || data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" class="empty-state">No milestones found for container ${id}.</td></tr>`
+      return
+    }
+    tbody.innerHTML = data.map(r => `
+      <tr>
+        <td>${r.milestone_id || '—'}</td>
+        <td>${r.site_name || '—'}</td>
+        <td><span class="badge ${r.status || ''}">${r.status || '—'}</span></td>
+        <td>${fmt(r.timestamp)}</td>
+      </tr>`).join('')
+  } catch (e) {
+    if (e.message === 'Session expired') return
+    tbody.innerHTML = `<tr><td colspan="4">Error: ${e.message}</td></tr>`
+  }
+}
+
+// ============================================================
+// FORMS
+// ============================================================
+async function createTrip(e) {
+  e.preventDefault()
+  const msg = document.getElementById('trip-msg')
+  msg.className = 'msg'
+  msg.textContent = 'Creating...'
+  
+  try {
+    const data = await authFetch(`${API}/trips`, {
+      method: 'POST',
+      body: JSON.stringify({
+        vehicle_id: +document.getElementById('t-vehicle').value,
+        driver_id: +document.getElementById('t-driver').value,
+        origin_site_id: +document.getElementById('t-origin').value,
+        destination_site_id: +document.getElementById('t-dest').value,
+        departure_time: document.getElementById('t-departure').value,
+      })
+    })
+    if (data && data.trip_id) {
+      msg.className = 'msg success'
+      msg.textContent = `✅ Trip ${data.trip_id} created successfully.`
+      loadTrips()
+    } else if (data && data.error) {
+      msg.className = 'msg error'
+      msg.textContent = `❌ ${data.error}`
+    } else {
+      msg.className = 'msg error'
+      msg.textContent = '❌ Failed to create trip.'
+    }
+  } catch (e) {
+    msg.className = 'msg error'
+    msg.textContent = `❌ ${e.message || 'Failed'}`
+  }
+}
+
+async function createMilestone(e) {
+  e.preventDefault()
+  const msg = document.getElementById('milestone-msg')
+  msg.className = 'msg'
+  msg.textContent = 'Recording...'
+  
+  try {
+    const data = await authFetch(`${API}/milestones`, {
+      method: 'POST',
+      body: JSON.stringify({
+        container_id: +document.getElementById('m-container').value,
+        site_id: +document.getElementById('m-site').value,
+        status: document.getElementById('m-status').value,
+      })
+    })
+    if (data && data.milestone_id) {
+      msg.className = 'msg success'
+      msg.textContent = `✅ Milestone ${data.milestone_id} recorded.`
+      loadMilestones()
+      loadTower()
+    } else if (data && data.error) {
+      msg.className = 'msg error'
+      msg.textContent = `❌ ${data.error}`
+    } else {
+      msg.className = 'msg error'
+      msg.textContent = '❌ Failed to record milestone.'
+    }
+  } catch (e) {
+    msg.className = 'msg error'
+    msg.textContent = `❌ ${e.message || 'Failed'}`
+  }
+}
+
+async function createHandover(e) {
+  e.preventDefault()
+  const msg = document.getElementById('handover-msg')
+  msg.className = 'msg'
+  msg.textContent = 'Recording...'
+  
+  try {
+    const data = await authFetch(`${API}/handovers`, {
+      method: 'POST',
+      body: JSON.stringify({
+        container_id: +document.getElementById('h-container').value,
+        from_site_id: +document.getElementById('h-from').value,
+        to_site_id: +document.getElementById('h-to').value,
+        verified_by: document.getElementById('h-verified').value,
+      })
+    })
+    if (data && data.handover_id) {
+      msg.className = 'msg success'
+      msg.textContent = `✅ Handover ${data.handover_id} recorded.`
+    } else if (data && data.error) {
+      msg.className = 'msg error'
+      msg.textContent = `❌ ${data.error}`
+    } else {
+      msg.className = 'msg error'
+      msg.textContent = '❌ Failed to record handover.'
+    }
+  } catch (e) {
+    msg.className = 'msg error'
+    msg.textContent = `❌ ${e.message || 'Failed'}`
+  }
+}
+
+async function createIncident(e) {
+  e.preventDefault()
+  const msg = document.getElementById('incident-msg')
+  msg.className = 'msg'
+  msg.textContent = 'Reporting...'
+  
+  try {
+    const data = await authFetch(`${API}/incidents`, {
+      method: 'POST',
+      body: JSON.stringify({
+        container_id: +document.getElementById('i-container').value,
+        trip_id: +document.getElementById('i-trip').value,
+        type: document.getElementById('i-type').value,
+        description: document.getElementById('i-description').value,
+      })
+    })
+    if (data && data.incident_id) {
+      msg.className = 'msg success'
+      msg.textContent = `✅ Incident ${data.incident_id} reported.`
+    } else if (data && data.error) {
+      msg.className = 'msg error'
+      msg.textContent = `❌ ${data.error}`
+    } else {
+      msg.className = 'msg error'
+      msg.textContent = '❌ Failed to report incident.'
+    }
+  } catch (e) {
+    msg.className = 'msg error'
+    msg.textContent = `❌ ${e.message || 'Failed'}`
+  }
+}
+
+// ============================================================
+// SYNC
+// ============================================================
+async function triggerSync() {
+  const msg = document.getElementById('sync-msg')
+  msg.className = 'msg'
+  msg.textContent = 'Syncing...'
+  
+  try {
+    const others = SITES.filter(s => s.url !== API).map(s => s.internal)
+    const data = await authFetch(`${API}/sync/push`, {
+      method: 'POST',
+      body: JSON.stringify({ sites: others })
+    })
+    if (data) {
+      const ok = data.results?.filter(r => r.status === 'ok').length || 0
+      const off = data.results?.filter(r => r.status === 'offline').length || 0
+      msg.className = 'msg success'
+      msg.textContent = `✅ Sync done — ${ok} sites updated, ${off} offline`
+    } else {
+      msg.className = 'msg error'
+      msg.textContent = '❌ Sync failed'
+    }
+  } catch (e) {
+    msg.className = 'msg error'
+    msg.textContent = `❌ ${e.message || 'Sync failed'}`
+  }
+}
+
+async function checkAllSites() {
+  document.getElementById('sync-body').innerHTML = '<tr><td colspan="5">Checking...</td></tr>'
+  const rows = await Promise.all(SITES.map(async site => {
+    try {
+      const headers = authHeaders()
+      const [containers, milestones] = await Promise.all([
+        fetch(`${site.url}/containers`, { headers }).then(r => r.json()),
+        fetch(`${site.url}/milestones/1`, { headers }).then(r => r.json()),
+      ])
+      return `<tr>
+        <td>${site.name}</td><td>${site.url}</td>
+        <td><span class="badge online">online</span></td>
+        <td>${Array.isArray(containers) ? containers.length : '—'}</td>
+        <td>${Array.isArray(milestones) ? milestones.length : '—'}</td></tr>`
+    } catch {
+      return `<tr>
+        <td>${site.name}</td><td>${site.url}</td>
+        <td><span class="badge offline">offline</span></td>
+        <td>—</td><td>—</td></tr>`
+    }
+  }))
+  document.getElementById('sync-body').innerHTML = rows.join('')
+}
+
+// ============================================================
+// INIT - Restore session
+// ============================================================
+const storedToken = sessionStorage.getItem('borderflow_token')
+const storedUser = sessionStorage.getItem('borderflow_user')
+const storedPassword = sessionStorage.getItem('borderflow_password')
+
+if (storedToken && storedUser && storedPassword) {
+  try {
+    AUTH_TOKEN = storedToken
+    CURRENT_USER = JSON.parse(storedUser)
+    LOGIN_PASSWORD = storedPassword
+    
+    const userSiteId = CURRENT_USER.site_id || ROLE_SITE_MAP[CURRENT_USER.role] || 1
+    API = SITES.find(s => s.id === userSiteId)?.url || SITES[0].url
+    
+    document.getElementById('login-screen').style.display = 'none'
+    document.getElementById('app-header').classList.add('show')
+    document.getElementById('user-name').textContent = CURRENT_USER.full_name
+    document.getElementById('user-role').textContent = CURRENT_USER.role.replace(/_/g, ' ')
+    document.getElementById('user-site').textContent = CURRENT_USER.site_id ? `Site ${CURRENT_USER.site_id}` : 'Global'
+    document.getElementById('site-select').value = API
+    updateSiteBadge()
+    
+    configureRoleUI()
+    loadTower()
+    loadContainers()
+    loadTrips()
+  } catch (e) {
+    AUTH_TOKEN = null
+    CURRENT_USER = null
+    LOGIN_PASSWORD = null
+    sessionStorage.clear()
+  }
+}
+</script>
+</body>
+</html>

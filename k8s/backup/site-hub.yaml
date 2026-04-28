@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hub-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hub-postgres
+  template:
+    metadata:
+      labels:
+        app: hub-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        env:
+        - name: POSTGRES_DB
+          value: borderflow
+        - name: POSTGRES_USER
+          value: postgres
+        - name: POSTGRES_PASSWORD
+          value: borderflow123
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: init-sql
+          mountPath: /docker-entrypoint-initdb.d
+      volumes:
+      - name: init-sql
+        configMap:
+          name: borderflow-sql
+          items:
+          - key: schema.sql
+            path: 01-schema.sql
+          - key: seed.sql
+            path: 02-seed.sql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hub-postgres
+spec:
+  selector:
+    app: hub-postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hub-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hub-app
+  template:
+    metadata:
+      labels:
+        app: hub-app
+    spec:
+      containers:
+      - name: app
+        image: docker.io/library/borderflow-app:latest
+        imagePullPolicy: Never
+        env:
+        - name: DB_USER
+          value: postgres
+        - name: DB_HOST
+          value: hub-postgres
+        - name: DB_NAME
+          value: borderflow
+        - name: DB_PASSWORD
+          value: borderflow123
+        - name: DB_PORT
+          value: "5432"
+        - name: SITE_ID
+          value: "4"
+        - name: PORT
+          value: "3000"
+        - name: JWT_SECRET
+          value: "56baa38a7e6b2a16dc4d1c2734bd734ca8d7ace7f2ea628a655b146bd08b1297"
+        - name: SYNC_SECRET
+          value: "f97e4a61df2d4a978fd9207b4989048b2f5b667c432a90156ea1889d1e464228"
+        ports:
+        - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hub-app
+spec:
+  type: NodePort
+  selector:
+    app: hub-app
+  ports:
+  - port: 3000
+    targetPort: 3000
+    nodePort: 30004

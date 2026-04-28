@@ -1,0 +1,104 @@
+# ── PostgreSQL for Maseru Depot ──────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: depot-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: depot-postgres
+  template:
+    metadata:
+      labels:
+        app: depot-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        env:
+        - name: POSTGRES_DB
+          value: borderflow
+        - name: POSTGRES_USER
+          value: postgres
+        - name: POSTGRES_PASSWORD
+          value: borderflow123
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: init-sql
+          mountPath: /docker-entrypoint-initdb.d
+      volumes:
+      - name: init-sql
+        configMap:
+          name: borderflow-sql
+          items:
+          - key: schema.sql
+            path: 01-schema.sql
+          - key: seed.sql
+            path: 02-seed.sql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: depot-postgres
+spec:
+  selector:
+    app: depot-postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+---
+# ── App for Maseru Depot ─────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: depot-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: depot-app
+  template:
+    metadata:
+      labels:
+        app: depot-app
+    spec:
+      containers:
+      - name: app
+        image: docker.io/library/borderflow-app:latest
+        imagePullPolicy: Never
+        env:
+        - name: DB_USER
+          value: postgres
+        - name: DB_HOST
+          value: depot-postgres
+        - name: DB_NAME
+          value: borderflow
+        - name: DB_PASSWORD
+          value: borderflow123
+        - name: DB_PORT
+          value: "5432"
+        - name: SITE_ID
+          value: "1"
+        - name: PORT
+          value: "3000"
+        - name: JWT_SECRET
+          value: "793c169ef545bbae3c4cf9f560e56fb5ef6017dedd39a9385bf5ada2f086d15a"
+        - name: SYNC_SECRET
+          value: "borderflow-shared-sync-secret-2026"
+        ports:
+        - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: depot-app
+spec:
+  type: NodePort
+  selector:
+    app: depot-app
+  ports:
+  - port: 3000
+    targetPort: 3000
+    nodePort: 30001
